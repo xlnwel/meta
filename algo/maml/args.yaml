@@ -1,7 +1,7 @@
 num_tasks_per_batch: 4
-num_classes_per_task: 5
-num_outer_samples_per_class: 15   # number of samples per class for outer loop learning
-num_inner_sample_per_class: 1  # i.e., k in k-shot learning
+num_classes_per_task: 5             # n in n-way learning
+num_outer_samples_per_class: 15     # number of samples per class for outer loop learning
+num_inner_sample_per_class: 1       # i.e., k in k-shot learning
 
 network:
     num_channels: 32
@@ -9,5 +9,5 @@ network:
     max_pool: True
     second_derivatives: True
     inner_learning_rate: 1e-3 # inner loop learning rate
-    num_inner_updates: 1
-    learning_rate: 1e-2   # outer loop learning rate
+    num_inner_updates: 5
+    meta_learning_rate: 1e-2   # outer loop learning rate

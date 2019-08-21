@@ -16,7 +16,7 @@ def get_images_labels(paths, labels, nb_samples=None, shuffle=False):
 	else:
 		sampler = lambda x: x
 	images_labels = [(os.path.join(path, image), lb) \
-	                for lb, path in zip(labels, paths) \
+	                for path, lb in zip(paths, labels) \
 	                for image in sampler(os.listdir(path))]
 	if shuffle:
 		random.shuffle(images_labels)
@@ -63,13 +63,16 @@ class DataGenerator:
         else:
             all_filenames = []
             for _ in tqdm.tqdm(range(num_total_batches), 'generating episodes'):
+                # sample data for each task
                 sampled_folders = random.sample(folders, self.num_classes_per_task)
                 random.shuffle(sampled_folders)
 
+                # for each task we have num_classes_per_task categories
+                # the same image may have different labels when it appears in different tasks
                 images_labels = get_images_labels(sampled_folders, range(self.num_classes_per_task), nb_samples=self.num_samples_per_class, shuffle=False)
 
                 filenames, labels = list(zip(*images_labels))
-                all_filenames.extend(filenames)
+                all_filenames += filenames
             
             if training:
                 with open('filelist.pkl', 'wb') as f:
@@ -114,12 +117,15 @@ class DataGenerator:
 
 
 if __name__ == '__main__':
-    dg = DataGenerator(5, 16, 4, 500)
+    dg = DataGenerator(5, 2, 4, 500)
     image, label = dg.make_data_tensor()
 
     with tf.Session() as sess:
         img, lb = sess.run([image, label])
         pwc(f'{img.shape}')
+        lb = np.argmax(lb, 2)
+        print(lb)
         pwc(f'{lb.shape}')
         # comment out tf.one_hot above to enable the following test 
-        save_image(img[0][lb[0]==1], './data_generator_test/img.png')
+        for i in range(5):
+            save_image(img[i][lb[i]==1], f'./data_generator_test/img{i}.png')
