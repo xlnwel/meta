@@ -24,18 +24,16 @@ def get_images_labels(paths, labels, nb_samples=None, shuffle=False):
 
 
 class DataGenerator:
-    def __init__(self, num_tasks_per_batch, num_classes_per_task, num_samples_per_class, total_batch_num=200000):
+    def __init__(self, num_tasks_per_batch, num_classes_per_task, num_samples_per_class, 
+                metatrain_folder, metaval_folder, total_batch_num=200000):
         # number of tasks per batchå
         self.num_tasks_per_batch = num_tasks_per_batch      # T
         # number of image samples per class
         self.num_classes_per_task = num_classes_per_task    # C
         self.num_samples_per_class = num_samples_per_class  # S
         self.batch_size = num_classes_per_task * num_samples_per_class * num_tasks_per_batch
-        self.image_shape = (84, 84, 3)
+        self.image_size = (84, 84)
         self.total_batch_num = total_batch_num
-
-        metatrain_folder = 'dataset/miniimagenet/train'
-        metaval_folder = 'dataset/miniimagenet/test'
 
         self.metatrain_folders = [os.path.join(metatrain_folder, label) \
                                 for label in os.listdir(metatrain_folder) \
@@ -69,7 +67,10 @@ class DataGenerator:
 
                 # for each task we have num_classes_per_task categories
                 # the same image may have different labels when it appears in different tasks
-                images_labels = get_images_labels(sampled_folders, range(self.num_classes_per_task), nb_samples=self.num_samples_per_class, shuffle=False)
+                images_labels = get_images_labels(sampled_folders, 
+                                                  range(self.num_classes_per_task), 
+                                                  nb_samples=self.num_samples_per_class, 
+                                                  shuffle=False)
 
                 filenames, labels = list(zip(*images_labels))
                 all_filenames += filenames
@@ -79,7 +80,7 @@ class DataGenerator:
                     pickle.dump(all_filenames, f)
                     pwc('Save all file names to filelist.pkl', 'magenta')
 
-        _, images = image_dataset(all_filenames, self.batch_size, norm_range=[0, 1], shuffle=False)
+        _, images = image_dataset(all_filenames, self.batch_size, self.image_size, norm_range=[0, 1], shuffle=False)
         num_samples_per_task = self.num_classes_per_task * self.num_samples_per_class
         all_image_batches, all_label_batches = [], []
 
@@ -113,11 +114,12 @@ class DataGenerator:
         # [4, C*S, C]
         all_label_batches = tf.one_hot(all_label_batches, self.num_classes_per_task)
 
+        pwc('Data pipeline has been constructed!', 'magenta')
         return all_image_batches, all_label_batches
 
 
 if __name__ == '__main__':
-    dg = DataGenerator(5, 2, 4, 500)
+    dg = DataGenerator(5, 2, 4, 500, 'dataset/miniimagenet/train', 'dataset/miniimagenet/test')
     image, label = dg.make_data_tensor()
 
     with tf.Session() as sess:

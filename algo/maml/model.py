@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from basic_model.model import Model
-from utility.debug_tools import timeit
+from utility.debug_tools import timeit, pwc
 from utility.tf_utils import stats_summary
 from dataset.data_generator import DataGenerator
 from algo.maml.network import Network
@@ -23,10 +23,14 @@ class MAML(Model):
                  log_stats=False, 
                  device=None,
                  reuse=None):
-        self.training = training
+        self._training = training
         self.k = args['num_inner_sample_per_class']
         self.num_classes = args['num_classes_per_task']
-        self.dataset = DataGenerator(args['num_tasks_per_batch'], self.num_classes, self.k + args['num_outer_samples_per_class'])
+        self.dataset = DataGenerator(args['num_tasks_per_batch'], 
+                                    self.num_classes, 
+                                    self.k + args['num_outer_samples_per_class'],
+                                    args['metatrain_folder'],
+                                    args['metaval_folder'])
         
         super().__init__(name, args, 
                          sess_config=sess_config, 
@@ -36,6 +40,8 @@ class MAML(Model):
                          log_stats=log_stats, 
                          device=device,
                          reuse=reuse)
+
+        pwc(f'Model {self.name} has been constructed!', 'magenta')
 
     def train(self, start_itr, duration, start_time, times):
         times = deque(maxlen=100)
@@ -63,8 +69,7 @@ class MAML(Model):
 
     """ Implementation """
     def _build_graph(self):
-        with tf.device('/CPU: 0'):
-            inner_image, outer_image, inner_label, outer_label = self._prepare_data()
+        inner_image, outer_image, inner_label, outer_label = self._prepare_data()
 
         self.args['network']['num_classes'] = self.num_classes
         self.args['network']['k'] = self.k
@@ -75,14 +80,14 @@ class MAML(Model):
                                 log_tensorboard=self.log_tensorboard, 
                                 log_params=self.log_params)
 
-        self._log_train_info()
+        # self._log_train_info()
         
     def _prepare_data(self):
         with tf.name_scope('data'):
             image, label = self.dataset.make_data_tensor(self.training)
 
-            inner_image = tf.slice(image, [0, 0, 0], [-1, self.k * self.num_classes, -1])
-            outer_image = tf.slice(image, [0, self.k * self.num_classes, 0], [-1, -1, -1])
+            inner_image = tf.slice(image, [0, 0, 0, 0, 0], [-1, self.k * self.num_classes, -1, -1, -1])
+            outer_image = tf.slice(image, [0, self.k * self.num_classes, 0, 0, 0], [-1, -1, -1, -1, -1])
             inner_label = tf.slice(label, [0, 0, 0], [-1, self.k * self.num_classes, -1])
             outer_label = tf.slice(label, [0, self.k * self.num_classes, 0], [-1, -1, -1])
             

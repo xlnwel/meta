@@ -21,32 +21,35 @@ class Network(Module):
         super().__init__(name, 
                          args, 
                          graph, 
+                         scope_prefix=scope_prefix,
                          log_tensorboard=log_tensorboard, 
                          log_params=log_params)
 
     """ Implementation """
     def _build_graph(self):
         num_tasks_per_batch = self.args['num_tasks_per_batch']
+        num_inner_updates = self.args['num_inner_updates']
         self.weights = _conv_weights(self.args['num_channels'], self.args['num_classes'])
 
-        dtype = [tf.float32, tf.float32, tf.float32]
+        dtype = [tf.float32, tf.float32, [tf.float32] * num_inner_updates, [tf.float32] * num_inner_updates]
         # to construct the network for later reuse
         self._task_metalearn([x[0] for x in self.input_label], reuse=False)
         # here we implicitly reuse all parameters constructed in the previous step
         results = tf.map_fn(self._task_metalearn, elems=self.input_label, dtype=dtype, 
-                            parallel_iterations='num_tasks_per_batch', name='map_fn')
+                            parallel_iterations=num_tasks_per_batch, name='map_fn')
         task_losses, task_accuracies, outer_losses, outer_accuracies = results
 
-        with tf.name_scope('train'):
+        with tf.variable_scope('train'):
             self.avg_task_loss = tf.reduce_sum(task_losses) / num_tasks_per_batch
             self.avg_outer_losses = [tf.reduce_sum(loss) / num_tasks_per_batch for loss in outer_losses]
             self.avg_task_accuracy = tf.reduce_sum(task_accuracies) / num_tasks_per_batch
-            self.avg_outer_accuracies = tf.reduce_sum(outer_accuracies) / num_tasks_per_batch
+            self.avg_outer_accuracies = [tf.reduce_sum(acc) / num_tasks_per_batch for acc in outer_accuracies]
 
-            optimizer = tf.train.AdamOptimizer(self.args['meta_learning_rate'])
-            gvs = optimizer.compute_gradients(self.avg_outer_losses[-1])
-            gvs = [(tf.clip_by_value(grad, -10, 10), var) for grad, var in gvs]
-            self.opt_op = optimizer.apply_gradients(gvs)
+            self.opt_op = self._optimization_op(self.avg_outer_losses[-1])
+            # optimizer = tf.train.AdamOptimizer(float(self.args['meta_learning_rate']))
+            # gvs = optimizer.compute_gradients(self.avg_outer_losses[-1])
+            # gvs = [(tf.clip_by_norm(grad, 10), var) for grad, var in gvs]
+            # self.opt_op = optimizer.apply_gradients(gvs)
 
     def _task_metalearn(self, inputs, reuse=True):
         """construct graph for a task with data inputs
@@ -63,7 +66,7 @@ class Network(Module):
                 return tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=label) / self.args['k']
         
         second_derivatives = self.args['second_derivatives']
-        inner_lr = self.args['inner_learning_rate']
+        inner_lr = float(self.args['inner_learning_rate'])
         num_inner_updates = self.args['num_inner_updates']
 
         inner_image, outer_image, inner_label, outer_label = inputs
@@ -94,7 +97,7 @@ class Network(Module):
             task_accuracy = tc.metrics.accuracy(tf.argmax(task_output, 1), tf.argmax(inner_label, 1))
             outer_accuracies = [tc.metrics.accuracy(tf.argmax(out, 1), tf.argmax(outer_label, 1)) for out in outer_ouputs]
 
-        return task_loss, task_accuracy, outer_losses, outer_accuracies
+        return [task_loss, task_accuracy, outer_losses, outer_accuracies]
 
     def _forward_conv(self, x, weights, reuse=None):
         norm = self.args['norm']
@@ -113,7 +116,7 @@ class Network(Module):
         return x
 
 def _conv_block(x, kernel, bias, norm, max_pool, block_idx):
-    if norm == 'bach_norm':
+    if norm == 'batch_norm':
         norm = lambda x: tf.layers.batch_normalization(x, training=True)
     elif norm =='layer_norm':
         norm = tc.layers.layer_norm
