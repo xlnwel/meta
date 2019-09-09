@@ -17,5 +17,5 @@ network:
     max_pool: True
     second_derivatives: True
     inner_learning_rate: 1e-3 # inner loop learning rate
-    num_inner_updates: 1
+    num_inner_updates: 5
     learning_rate: 1e-2   # outer loop learning rate

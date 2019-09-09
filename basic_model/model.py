@@ -153,7 +153,7 @@ class Module(Layer):
         return opt_op
 
     def _get_variable_scope(self, scope_prefix, name):
-        return f'{scope_prefix}/{name}'
+        return f'{scope_prefix}/{name}' if scope_prefix else name
 
 
 class Model(Module):
@@ -199,16 +199,13 @@ class Model(Module):
 
         super().__init__(name, args, self.graph, log_tensorboard=log_tensorboard, 
                          log_params=log_params, device=device, reuse=reuse)
-                         
-        # reset variable scope for model
-        self.variable_scope = self.name
 
         display_var_info(self.trainable_variables)
 
         self.model_name = args['model_name']
         if self.log_tensorboard:
             self.graph_summary= self._setup_tensorboard_summary()
-
+        
         # rl-specific log configuration, not in self._build_graph to avoid being included in self.graph_summary
         if log_stats:
             self.logger = self._setup_logger(args['log_root_dir'], self.model_name)
@@ -216,9 +213,8 @@ class Model(Module):
 
         if log_tensorboard or log_stats:
             self.writer = self._setup_writer(args['log_root_dir'], self.model_name)
-        
+            
         self.sess.run(tf.variables_initializer(self.global_variables))
-        pwc('All variables have been initialized', 'magenta')
 
         if save:
             self.saver = self._setup_saver()

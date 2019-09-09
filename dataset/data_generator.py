@@ -31,7 +31,7 @@ class DataGenerator:
         # number of image samples per class
         self.num_classes_per_task = num_classes_per_task    # C
         self.num_samples_per_class = num_samples_per_class  # S
-        self.batch_size = num_classes_per_task * num_samples_per_class * num_tasks_per_batch
+        self.batch_size = num_tasks_per_batch * num_classes_per_task * num_samples_per_class
         self.image_size = (84, 84)
         self.total_batch_num = total_batch_num
 
@@ -80,7 +80,7 @@ class DataGenerator:
                     pickle.dump(all_filenames, f)
                     pwc('Save all file names to filelist.pkl', 'magenta')
 
-        _, images = image_dataset(all_filenames, self.batch_size, self.image_size, norm_range=[0, 1], shuffle=False)
+        _, images = image_data`set(all_filenames, self.batch_size, self.image_size, norm_range=[0, 1], shuffle=False)
         num_samples_per_task = self.num_classes_per_task * self.num_samples_per_class
         all_image_batches, all_label_batches = [], []
 
