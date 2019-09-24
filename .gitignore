@@ -2,3 +2,4 @@
 **/filelist.pkl
 **/data_generator_test/**
 .vscode/**
+.DS_Store
